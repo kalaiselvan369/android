@@ -29,45 +29,39 @@ import com.owncloud.android.datamodel.ThumbnailsCacheManager;
 import com.owncloud.android.datamodel.UserProfile;
 import com.owncloud.android.datamodel.UserProfilesRepository;
 import com.owncloud.android.domain.UseCaseResult;
+import com.owncloud.android.domain.exceptions.FileNotFoundException;
+import com.owncloud.android.domain.user.model.UserInfo;
+import com.owncloud.android.domain.user.model.UserQuota;
 import com.owncloud.android.lib.common.OwnCloudClient;
 import com.owncloud.android.lib.common.accounts.AccountUtils;
 import com.owncloud.android.lib.common.operations.RemoteOperationResult;
 import com.owncloud.android.lib.resources.users.GetRemoteUserAvatarOperation;
-import com.owncloud.android.domain.user.model.UserInfo;
-import com.owncloud.android.lib.resources.users.GetRemoteUserQuotaOperation;
-import com.owncloud.android.lib.resources.users.GetRemoteUserQuotaOperation.RemoteQuota;
 import com.owncloud.android.operations.common.SyncOperation;
 import com.owncloud.android.operations.common.UseCaseHelper;
 import timber.log.Timber;
 
 /**
  * Get and save user's profile from the server.
- *
+ * <p>
  * Currently only retrieves the display name.
  */
 public class GetUserProfileOperation extends SyncOperation {
-
-    private String mRemotePath;
-
     /**
      * Constructor
-     *
-     * @param remotePath Remote path of the file.
      */
-    GetUserProfileOperation(String remotePath) {
-        mRemotePath = remotePath;
+    GetUserProfileOperation() {
     }
 
     /**
      * Performs the operation.
-     *
+     * <p>
      * Target user account is implicit in 'client'.
-     *
+     * <p>
      * Stored account is implicit in {@link #getStorageManager()}.
      *
      * @return Result of the operation. If successful, includes an instance of
-     *              {@link String} with the display name retrieved from the server.
-     *              Call {@link RemoteOperationResult#getData()}.get(0) to get it.
+     * {@link String} with the display name retrieved from the server.
+     * Call {@link RemoteOperationResult#getData()}.get(0) to get it.
      */
     @Override
     protected RemoteOperationResult run(OwnCloudClient client) {
@@ -78,7 +72,7 @@ public class GetUserProfileOperation extends SyncOperation {
             UserProfilesRepository userProfilesRepository = UserProfilesRepository.getUserProfilesRepository();
             UseCaseHelper useCaseHelper = new UseCaseHelper();
             UseCaseResult<UserInfo> useCaseResult = useCaseHelper.getUserInfo();
-            if (useCaseResult.getDataOrNull()!= null) {
+            if (useCaseResult.getDataOrNull() != null) {
                 // store display name with account data
                 AccountManager accountManager = AccountManager.get(MainApp.Companion.getAppContext());
                 UserInfo userInfo = useCaseResult.getDataOrNull();
@@ -104,20 +98,17 @@ public class GetUserProfileOperation extends SyncOperation {
                 );
 
                 /// get quota
-                GetRemoteUserQuotaOperation getRemoteUserQuotaOperation = new GetRemoteUserQuotaOperation(mRemotePath);
-
-                final RemoteOperationResult<RemoteQuota> quotaOperationResult =
-                        getRemoteUserQuotaOperation.execute(client);
-
-                if (quotaOperationResult.isSuccess()) {
-
-                    RemoteQuota remoteQuota = quotaOperationResult.getData();
+                UseCaseResult<UserQuota> quotaUseCaseResult = useCaseHelper.getUserQuota(storedAccount.name);
+                if (quotaUseCaseResult.getDataOrNull() != null) {
+                    // store display name with account data
+                    UserQuota userQuotaResult = quotaUseCaseResult.getDataOrNull();
+                    Timber.d("User quota recovered from UseCaseHelper:GetUserQuota -> %s", userQuotaResult.toString());
 
                     UserProfile.UserQuota userQuota = new UserProfile.UserQuota(
-                            remoteQuota.getFree(),
-                            remoteQuota.getRelative(),
-                            remoteQuota.getTotal(),
-                            remoteQuota.getUsed()
+                            userQuotaResult.getAvailable(),
+                            userQuotaResult.getRelative(),
+                            userQuotaResult.getTotal(),
+                            userQuotaResult.getUsed()
                     );
 
                     userProfile.setQuota(userQuota);
@@ -145,7 +136,7 @@ public class GetUserProfileOperation extends SyncOperation {
                         );
                         userProfile.setAvatar(userAvatar);
 
-                    } else if (quotaOperationResult.getCode().equals(RemoteOperationResult.ResultCode.FILE_NOT_FOUND)) {
+                    } else if (avatarOperationResult.getCode().equals(RemoteOperationResult.ResultCode.FILE_NOT_FOUND)) {
                         Timber.i("No avatar available, removing cached copy");
                         userProfilesRepository.deleteAvatar(storedAccount.name);
                         ThumbnailsCacheManager.removeAvatarFromCache(storedAccount.name);
@@ -163,7 +154,7 @@ public class GetUserProfileOperation extends SyncOperation {
                     return result;
 
                 } else {
-                    return quotaOperationResult;
+                    return new RemoteOperationResult<>(RemoteOperationResult.ResultCode.UNKNOWN_ERROR);
                 }
             } else {
                 return new RemoteOperationResult<>(RemoteOperationResult.ResultCode.UNKNOWN_ERROR);
@@ -176,6 +167,7 @@ public class GetUserProfileOperation extends SyncOperation {
 
     /**
      * Converts size of file icon from dp to pixel
+     *
      * @return int
      */
     private int getAvatarDimension() {

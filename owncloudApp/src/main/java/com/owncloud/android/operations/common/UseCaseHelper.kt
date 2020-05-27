@@ -20,7 +20,9 @@ package com.owncloud.android.operations.common
 
 import com.owncloud.android.domain.UseCaseResult
 import com.owncloud.android.domain.user.model.UserInfo
+import com.owncloud.android.domain.user.model.UserQuota
 import com.owncloud.android.domain.user.usecases.GetUserInfoAsyncUseCase
+import com.owncloud.android.domain.user.usecases.RefreshUserQuotaFromServerAsyncUseCase
 import org.koin.core.KoinComponent
 import org.koin.core.inject
 
@@ -30,6 +32,9 @@ import org.koin.core.inject
  */
 class UseCaseHelper : KoinComponent {
     private val getUserInfoAsyncUseCase: GetUserInfoAsyncUseCase by inject()
+    private val refreshUserQuotaFromServerAsyncUseCase: RefreshUserQuotaFromServerAsyncUseCase by inject()
 
     fun getUserInfo(): UseCaseResult<UserInfo> = getUserInfoAsyncUseCase.execute(Unit)
+    fun getUserQuota(accountName: String): UseCaseResult<UserQuota> =
+        refreshUserQuotaFromServerAsyncUseCase.execute(RefreshUserQuotaFromServerAsyncUseCase.Params(accountName))
 }

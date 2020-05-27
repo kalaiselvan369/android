@@ -16,13 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-package com.owncloud.android.domain.user
+package com.owncloud.android.testutil
 
 import com.owncloud.android.domain.user.model.UserInfo
 import com.owncloud.android.domain.user.model.UserQuota
 
-interface UserRepository {
-    fun getUserInfo(): UserInfo
-    fun getUserQuota(accountName: String): UserQuota
-}
+val OC_USER_INFO = UserInfo(
+    id = "admin",
+    displayName = "adminOc",
+    email = null
+)
+
+val OC_USER_QUOTA = UserQuota(
+    used = 80_000,
+    available = 200_000
+)
